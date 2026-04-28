@@ -1,0 +1,53 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: exp9-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-exp9db}
+      POSTGRES_USER: ${POSTGRES_USER:-exp9user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-exp9pass}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-exp9user} -d ${POSTGRES_DB:-exp9db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - exp9-net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: exp9-backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-exp9db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-exp9user}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-exp9pass}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    networks:
+      - exp9-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: exp9-frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    networks:
+      - exp9-net
+
+volumes:
+  pgdata:
+
+networks:
+  exp9-net:
+    driver: bridge
